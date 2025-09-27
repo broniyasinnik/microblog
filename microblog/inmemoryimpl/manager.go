@@ -1,10 +1,12 @@
-package microblog
+package inmemoryimpl
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"math/rand"
+	"micro-blog/microblog"
 	"sort"
 	"strconv"
 	"sync"
@@ -12,29 +14,17 @@ import (
 )
 
 type PostIdsList []string
-type UserPost struct {
-	PostId    string
-	Text      string
-	AuthorId  string
-	CreatedAt time.Time
-}
-
-type Manager interface {
-	AddPost(userId string, post string) (UserPost, error)
-	GetPost(userId string) (UserPost, error)
-	GetPostsInPage(userId string, token string, size uint8) ([]UserPost, string, error)
-}
 
 type InMemoryManager struct {
 	mu        sync.RWMutex
 	userPosts map[string]PostIdsList
-	allPosts  map[string]UserPost
+	allPosts  map[string]microblog.UserPost
 }
 
 func NewInMemoryManager() *InMemoryManager {
 	return &InMemoryManager{
 		userPosts: make(map[string]PostIdsList),
-		allPosts:  make(map[string]UserPost),
+		allPosts:  make(map[string]microblog.UserPost),
 	}
 }
 
@@ -45,30 +35,30 @@ func createPostID(createTime int) string {
 	return postID
 }
 
-func (manager *InMemoryManager) AddPost(userId string, text string) (UserPost, error) {
+func (manager *InMemoryManager) AddPost(_ context.Context, userId string, text string) (microblog.UserPost, error) {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 
 	postsList, _ := manager.userPosts[userId]
 	createTime := time.Now().UTC()
 	postId := createPostID(createTime.Second())
-	post := UserPost{postId, text, userId, createTime}
+	post := microblog.UserPost{PostId: postId, Text: text, AuthorId: userId, CreatedAt: createTime}
 	manager.userPosts[userId] = append(postsList, postId)
 	manager.allPosts[post.PostId] = post
 	return post, nil
 }
 
-func (manager *InMemoryManager) GetPost(postId string) (UserPost, error) {
+func (manager *InMemoryManager) GetPost(_ context.Context, postId string) (microblog.UserPost, error) {
 	manager.mu.RLock()
 	defer manager.mu.RUnlock()
 	post, ok := manager.allPosts[postId]
 	if !ok {
-		return UserPost{}, errors.New("post not found")
+		return microblog.UserPost{}, errors.New("post not found")
 	}
 	return post, nil
 }
 
-func (manager *InMemoryManager) GetPostsInPage(userId string, token string, size uint8) ([]UserPost, string, error) {
+func (manager *InMemoryManager) GetPostsInPage(_ context.Context, userId string, token string, size uint8) ([]microblog.UserPost, string, error) {
 	manager.mu.RLock()
 	defer manager.mu.RUnlock()
 	start := 0
@@ -96,7 +86,7 @@ func (manager *InMemoryManager) GetPostsInPage(userId string, token string, size
 		end = len(posts)
 	}
 	var nextToken string
-	var result []UserPost
+	var result []microblog.UserPost
 	for _, post := range posts[start:end] {
 		result = append(result, manager.allPosts[post])
 	}
@@ -105,4 +95,8 @@ func (manager *InMemoryManager) GetPostsInPage(userId string, token string, size
 	}
 	return result, nextToken, nil
 
+}
+
+func (manager *InMemoryManager) IsReady(_ context.Context) bool {
+	return true
 }

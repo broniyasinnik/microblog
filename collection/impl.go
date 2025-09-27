@@ -1,4 +1,4 @@
-package microblog
+package collection
 
 import (
 	"container/heap"

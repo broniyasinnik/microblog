@@ -24,7 +24,7 @@ func NewServer(manager microblog.Manager) *http.Server {
 	r.HandleFunc("/api/v1/posts", handler.CreatePost).Methods(http.MethodPost)
 	r.HandleFunc("/api/v1/posts/{postId}", handler.GetPost).Methods(http.MethodGet)
 	r.HandleFunc("/api/v1/users/{userId}/posts", handler.GetPosts).Methods(http.MethodGet)
-
+	r.HandleFunc("/maintenance/ping", handler.CheckIsReady).Methods(http.MethodGet)
 	srv := &http.Server{
 		Addr:         "0.0.0.0:8080",
 		Handler:      r,
@@ -66,7 +66,7 @@ func (h *HTTPHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post, err := h.manager.AddPost(usrId, body.Text)
+	post, err := h.manager.AddPost(r.Context(), usrId, body.Text)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -81,7 +81,7 @@ func (h *HTTPHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPHandler) GetPost(w http.ResponseWriter, r *http.Request) {
 	postId := strings.TrimPrefix(r.URL.Path, `/api/v1/posts/`)
-	post, err := h.manager.GetPost(postId)
+	post, err := h.manager.GetPost(r.Context(), postId)
 	if err != nil {
 		http.Error(w, "Post not found", http.StatusNotFound)
 	} else {
@@ -99,7 +99,7 @@ func (h *HTTPHandler) GetPosts(w http.ResponseWriter, r *http.Request) {
 	fmt.Sscanf(r.URL.Query().Get("size"), "%d", &pageSize)
 
 	// Let the manager fetch the posts in the relevant page
-	posts, nextPage, err := h.manager.GetPostsInPage(userId, page, pageSize)
+	posts, nextPage, err := h.manager.GetPostsInPage(r.Context(), userId, page, pageSize)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	} else {
@@ -114,4 +114,12 @@ func (h *HTTPHandler) GetPosts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(rawResponse)
 	}
+}
+
+func (h *HTTPHandler) CheckIsReady(w http.ResponseWriter, r *http.Request) {
+	if ready := h.manager.IsReady(r.Context()); !ready {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

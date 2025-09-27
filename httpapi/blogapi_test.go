@@ -9,6 +9,8 @@ import (
 	"io"
 	"log"
 	"micro-blog/microblog"
+	"micro-blog/microblog/inmemoryimpl"
+	"micro-blog/microblog/mongoimpl"
 	"net/http"
 	"os"
 	"strconv"
@@ -28,18 +30,26 @@ var ctx = context.Background()
 
 type APISuite struct {
 	suite.Suite
-	client http.Client
-
+	client        http.Client
+	manager       microblog.Manager
 	apiSpecRouter openapi3_routers.Router
 }
 
 func TestAPI(t *testing.T) {
-	suite.Run(t, &APISuite{})
+	t.Run("InMemory", func(t *testing.T) {
+		suite.Run(t, &APISuite{
+			manager: inmemoryimpl.NewInMemoryManager(),
+		})
+	})
+	t.Run("Mongo", func(t *testing.T) {
+		suite.Run(t, &APISuite{
+			manager: mongoimpl.NewMongoManager("mongodb://localhost:27017", "test"),
+		})
+	})
 }
 
 func (s *APISuite) SetupSuite() {
-	manager := microblog.NewInMemoryManager()
-	srv := NewServer(manager)
+	srv := NewServer(s.manager)
 	go func() {
 		err := srv.ListenAndServe()
 		log.Fatal(err)

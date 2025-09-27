@@ -3,8 +3,6 @@ info:
   title: Microblog API
   description: Microblog API
   version: 1.0.0
-servers:
-  - url: http://localhost:8080
 components:
   schemas:
     PostId:
@@ -70,7 +68,7 @@ paths:
                 $ref: '#/components/schemas/Post'
         401:
           description: >
-            Токен пользователя отсутствует в запросе, или передан в неверном формате.
+            Токен пользователя отсутствует в запросе, или передан в неверном формате, или его срок действия истёк.
   '/api/v1/posts/{postId}':
     get:
       summary: Получение поста по идентификатору
@@ -144,3 +142,10 @@ paths:
                           Поле отсутствует, если текущая страница содержит самый ранний пост пользователя.
         400:
           description: Некорректный запрос, например, из-за некорректного токена страницы.
+
+  /maintenance/ping:
+    get:
+      summary: Служебный эндпоинт для определения готовности сервиса к работе
+      responses:
+        200:
+          description: Сервис готов к работе

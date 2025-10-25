@@ -94,3 +94,26 @@ func (s *ManagerSuite) TestGetPostsInPage() {
 	s.Require().Equal(usr, posts[4].AuthorId)
 	s.Require().Equal("This is post number 1", posts[4].Text)
 }
+
+func (s *ManagerSuite) TestModifyPost() {
+	usr := "alice"
+	msg := "Original message"
+	p, err := s.manager.AddPost(ctx, usr, msg)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(p.PostId)
+	// Modify the post text
+	newText := "Updated message"
+	updated, err := s.manager.ModifyPost(ctx, p.PostId, newText)
+	s.Require().NoError(err)
+	s.Require().Equal(p.PostId, updated.PostId)
+	s.Require().Equal(usr, updated.AuthorId)
+	s.Require().Equal(newText, updated.Text)
+	s.Require().False(updated.LastModifiedAt.IsZero())
+	s.Require().True(updated.LastModifiedAt.After(p.CreatedAt))
+
+	// Ensure it persisted in storage by fetching it again
+	fetched, err := s.manager.GetPost(ctx, p.PostId)
+	s.Require().NoError(err)
+	s.Require().Equal(newText, fetched.Text)
+	s.Require().False(fetched.LastModifiedAt.IsZero())
+}

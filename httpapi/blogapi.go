@@ -25,6 +25,7 @@ func NewServer(manager microblog.Manager) *http.Server {
 	r.HandleFunc("/api/v1/posts/{postId}", handler.GetPost).Methods(http.MethodGet)
 	r.HandleFunc("/api/v1/users/{userId}/posts", handler.GetPosts).Methods(http.MethodGet)
 	r.HandleFunc("/maintenance/ping", handler.CheckIsReady).Methods(http.MethodGet)
+	r.HandleFunc("/api/v1/posts/{postId}", handler.ModifyPost).Methods(http.MethodPatch)
 	srv := &http.Server{
 		Addr:         "0.0.0.0:8080",
 		Handler:      r,
@@ -39,10 +40,11 @@ type CreatePostRequest struct {
 	Text string `json:"text"`
 }
 type CreatePostResponse struct {
-	PostId    string `json:"id"`
-	Text      string `json:"text"`
-	AuthorId  string `json:"authorId"`
-	CreatedAt string `json:"createdAt"`
+	PostId         string `json:"id"`
+	Text           string `json:"text"`
+	AuthorId       string `json:"authorId"`
+	CreatedAt      string `json:"createdAt"`
+	LastModifiedAt string `json:"lastModifiedAt"`
 }
 
 type GetPostsResponse struct {
@@ -71,7 +73,7 @@ func (h *HTTPHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	rawResponse, _ := json.Marshal(CreatePostResponse{post.PostId, post.Text, post.AuthorId, post.CreatedAt.Format(time.RFC3339)})
+	rawResponse, _ := json.Marshal(CreatePostResponse{post.PostId, post.Text, post.AuthorId, post.CreatedAt.Format(time.RFC3339), post.LastModifiedAt.Format(time.RFC3339)})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -85,7 +87,7 @@ func (h *HTTPHandler) GetPost(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Post not found", http.StatusNotFound)
 	} else {
-		rawResponse, _ := json.Marshal(CreatePostResponse{post.PostId, post.Text, post.AuthorId, post.CreatedAt.Format(time.RFC3339)})
+		rawResponse, _ := json.Marshal(CreatePostResponse{post.PostId, post.Text, post.AuthorId, post.CreatedAt.Format(time.RFC3339), post.LastModifiedAt.Format(time.RFC3339)})
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(rawResponse)
@@ -107,7 +109,7 @@ func (h *HTTPHandler) GetPosts(w http.ResponseWriter, r *http.Request) {
 		var resp GetPostsResponse
 		resp.NextPage = nextPage
 		for _, post := range posts {
-			resp.Posts = append(resp.Posts, CreatePostResponse{post.PostId, post.Text, post.AuthorId, post.CreatedAt.Format(time.RFC3339)})
+			resp.Posts = append(resp.Posts, CreatePostResponse{post.PostId, post.Text, post.AuthorId, post.CreatedAt.Format(time.RFC3339), post.LastModifiedAt.Format(time.RFC3339)})
 		}
 		rawResponse, _ := json.Marshal(resp)
 		w.Header().Set("Content-Type", "application/json")
@@ -122,4 +124,30 @@ func (h *HTTPHandler) CheckIsReady(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *HTTPHandler) ModifyPost(w http.ResponseWriter, r *http.Request) {
+	postId := strings.TrimPrefix(r.URL.Path, `/api/v1/posts/`)
+	usrId := r.Header.Get("System-Design-User-Id")
+	var body CreatePostResponse
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	post, err := h.manager.GetPost(r.Context(), postId)
+	if err != nil {
+		http.Error(w, "Post not found", http.StatusNotFound)
+	}
+	if post.AuthorId != usrId {
+		http.Error(w, "You are not the author of this post", http.StatusForbidden)
+	}
+	post, err = h.manager.ModifyPost(r.Context(), postId, body.Text)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	rawResponse, _ := json.Marshal(CreatePostResponse{post.PostId, post.Text, post.AuthorId, post.CreatedAt.Format(time.RFC3339), post.LastModifiedAt.Format(time.RFC3339)})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(rawResponse)
 }

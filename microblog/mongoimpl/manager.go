@@ -125,3 +125,26 @@ func (m *MongoManager) GetPostsInPage(ctx context.Context, userId string, token 
 
 	return posts, posts[len(posts)-1].PostId, nil
 }
+
+func (m *MongoManager) ModifyPost(ctx context.Context, postID string, text string) (microblog.UserPost, error) {
+	var updated microblog.UserPost
+	objID, _ := primitive.ObjectIDFromHex(postID)
+
+	update := bson.M{
+		"$set": bson.M{
+			"text":             text,
+			"last_modified_at": time.Now(),
+		},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	err := m.posts.FindOneAndUpdate(ctx, bson.M{"_id": objID}, update, opts).Decode(&updated)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return microblog.UserPost{}, microblog.ErrNotFound
+		}
+		return microblog.UserPost{}, fmt.Errorf("something went wrong - %w", microblog.ErrStorage)
+	}
+	updated.PostId = objID.Hex()
+	return updated, nil
+}

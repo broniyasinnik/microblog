@@ -100,3 +100,16 @@ func (manager *InMemoryManager) GetPostsInPage(_ context.Context, userId string,
 func (manager *InMemoryManager) IsReady(_ context.Context) bool {
 	return true
 }
+
+func (manager *InMemoryManager) ModifyPost(_ context.Context, postID string, post string) (microblog.UserPost, error) {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	oldPost, ok := manager.allPosts[postID]
+	if !ok {
+		return microblog.UserPost{}, errors.New("post not found")
+	}
+	oldPost.Text = post
+	oldPost.LastModifiedAt = time.Now().UTC()
+	manager.allPosts[postID] = oldPost
+	return oldPost, nil
+}

@@ -6,10 +6,11 @@ import (
 )
 
 type UserPost struct {
-	PostId    string    `bson:"-"`
-	Text      string    `bson:"text"`
-	AuthorId  string    `bson:"author_id"`
-	CreatedAt time.Time `bson:"created_at"`
+	PostId         string    `bson:"-"`
+	Text           string    `bson:"text"`
+	AuthorId       string    `bson:"author_id"`
+	CreatedAt      time.Time `bson:"created_at"`
+	LastModifiedAt time.Time `bson:"last_modified_at"`
 }
 
 type Manager interface {
@@ -17,4 +18,5 @@ type Manager interface {
 	GetPost(ctx context.Context, postID string) (UserPost, error)
 	GetPostsInPage(ctx context.Context, userId string, token string, size uint8) ([]UserPost, string, error)
 	IsReady(ctx context.Context) bool
+	ModifyPost(ctx context.Context, postID string, post string) (UserPost, error)
 }

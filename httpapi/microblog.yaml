@@ -39,6 +39,11 @@ components:
             - $ref: '#/components/schemas/ISOTimestamp'
             - nullable: false
             - readOnly: true
+        lastModifiedAt:
+          allOf:
+            - $ref: '#/components/schemas/ISOTimestamp'
+            - nullable: false
+            - readOnly: true
     PageToken:
       type: string
       pattern: '[A-Za-z0-9_\-]+'
@@ -85,6 +90,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Post'
+        404:
+          description: Поста с указанным идентификатором не существует
+    patch:
+      summary: Модификация поста
+      parameters:
+        - in: path
+          name: postId
+          required: true
+          schema:
+            $ref: '#/components/schemas/PostId'
+        - in: header
+          name: System-Design-User-Id
+          required: true
+          description: >
+            Идентификатор ползователя, который аутентифицирован в данном запросе.
+          schema:
+            $ref: '#/components/schemas/UserId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Post'
+      responses:
+        200:
+          description: Пост был успешно обновлен. В теле содержится обновленный пост.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        401:
+          description: Пользователь не аутентифирован
+        403:
+          description: Пост не может быть отредактирован, т.к. опубликован другим пользователем.
         404:
           description: Поста с указанным идентификатором не существует
   '/api/v1/users/{userId}/posts':
@@ -142,7 +180,6 @@ paths:
                           Поле отсутствует, если текущая страница содержит самый ранний пост пользователя.
         400:
           description: Некорректный запрос, например, из-за некорректного токена страницы.
-
   /maintenance/ping:
     get:
       summary: Служебный эндпоинт для определения готовности сервиса к работе
